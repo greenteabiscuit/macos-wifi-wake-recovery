@@ -3,22 +3,28 @@
 A small launch agent for Macs that get stuck with a stale DHCP connection
 after opening the lid. It listens for a user-triggered lid-open wake and, only
 on configured networks, safely power-cycles Wi-Fi and waits for the default
-gateway to become reachable.
+gateway to become available. When Cloudflare WARP is installed and enabled,
+it disconnects WARP before cycling Wi-Fi and reconnects it afterward.
 
 ## How it works
 
 - Detects wake events with `NSWorkspace`.
 - Ignores background wakes and wakes while the lid is closed.
-- Matches the current network against locally configured SSIDs or router IPs.
+- Matches locally configured SSIDs or router IPs before sleep and after wake,
+  so recovery still runs when the broken connection loses its route on wake.
+- Preserves the Cloudflare WARP toggle state: an enabled or failed connection
+  is restarted, while an intentionally disabled connection remains disabled.
 - Schedules a failsafe before turning Wi-Fi off, so an interruption cannot
-  leave Wi-Fi disabled.
-- Waits up to 20 seconds for DHCP and the default gateway to recover.
+  leave Wi-Fi or WARP disabled.
+- Waits up to 20 seconds each for DHCP/default routing and WARP to recover.
 
 ## Requirements
 
 - macOS
 - Apple's Command Line Tools (`xcode-select --install`) to compile the Swift
   monitor during installation
+- Optional: Cloudflare WARP. The recovery script automatically uses
+  `warp-cli` when the app is installed.
 
 ## Install
 

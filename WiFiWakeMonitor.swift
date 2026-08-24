@@ -105,6 +105,16 @@ private func targetNetworkState() -> (isTarget: Bool, ssidMatched: Bool, routerM
 final class WakeMonitor: NSObject {
     private var lastHandledWake = Date.distantPast
     private var recoveryRunning = false
+    private var targetBeforeSleep = targetNetworkState().isTarget
+
+    @objc func willSleep(_ notification: Notification) {
+        let network = targetNetworkState()
+        targetBeforeSleep = network.isTarget
+        appendLog(
+            "Sleep detected; target=\(network.isTarget), " +
+            "ssidMatched=\(network.ssidMatched), routerMatched=\(network.routerMatched)"
+        )
+    }
 
     @objc func didWake(_ notification: Notification) {
         let now = Date()
@@ -129,10 +139,10 @@ final class WakeMonitor: NSObject {
         }
 
         let network = targetNetworkState()
-        guard network.isTarget else {
+        guard network.isTarget || targetBeforeSleep else {
             appendLog(
                 "Skipped non-target wake (ssidMatched=\(network.ssidMatched), " +
-                "routerMatched=\(network.routerMatched))"
+                "routerMatched=\(network.routerMatched), targetBeforeSleep=\(targetBeforeSleep))"
             )
             return
         }
@@ -144,7 +154,8 @@ final class WakeMonitor: NSObject {
         recoveryRunning = true
         appendLog(
             "Target-network lid-open wake detected; starting Wi-Fi recovery " +
-            "(ssidMatched=\(network.ssidMatched), routerMatched=\(network.routerMatched))"
+            "(ssidMatched=\(network.ssidMatched), routerMatched=\(network.routerMatched), " +
+            "targetBeforeSleep=\(targetBeforeSleep))"
         )
 
         DispatchQueue.global(qos: .utility).async { [weak self] in
@@ -174,6 +185,12 @@ final class WakeMonitor: NSObject {
 }
 
 let monitor = WakeMonitor()
+NSWorkspace.shared.notificationCenter.addObserver(
+    monitor,
+    selector: #selector(WakeMonitor.willSleep(_:)),
+    name: NSWorkspace.willSleepNotification,
+    object: nil
+)
 NSWorkspace.shared.notificationCenter.addObserver(
     monitor,
     selector: #selector(WakeMonitor.didWake(_:)),
